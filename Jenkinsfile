@@ -112,7 +112,7 @@ pipeline {
         // Generate unique date / build stamp for file names
         Calendar cal = new GregorianCalendar()
 
-        String dateBuildNumber = 
+        /*String*/ dateBuildNumber = 
             String.format('%1$tY%1$tm%1$td%1$tH%1$tM%1$tS', cal) +
             ".${buildNumber}"
 
@@ -123,7 +123,7 @@ pipeline {
     // have a string suffix appended to the version number.
     // Release builds do not, as they presume that the developer has
     // manually updated the version with 'rc#' if necessary.
-    String versionSuffix = 
+    /*String*/ versionSuffix = 
         branchName =~ /^(feature\/|develop)/ ? '-unstable' : 
         branchName =~ /^hotfix\// ? '-hotfix': 
         branchName =~ /^PR-\d+$/ ? '-pr' :
@@ -135,7 +135,7 @@ pipeline {
         versionSuffix += ".${dateBuildNumber}"
     }
 
-    String fullVersionNumber = "${version}${versionSuffix}"
+    /*String*/ fullVersionNumber = "${version}${versionSuffix}"
 
                         // Extract the version suffix.
                         versionSuffix = fullVersionNumber.substring(version.length());
