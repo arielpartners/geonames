@@ -1,3 +1,5 @@
+@Library('ariel-utils') _
+
 // nodeLabel controls which Jenkins slaves this project can build on, and is required.
 //String nodeLabel = required value: parms.get('nodeLabel'), message: "'nodeLabel' parameter not set in the Jenkinsfile.  This parameter is required."
 
@@ -108,16 +110,7 @@ pipeline {
                         version = '1.0.0' //readVersion versionFile
                        
                         // Generate unique date / build stamp for file names
-//                        dateBuildNumber = buildSerialNumber buildNumber
-        // Generate unique date / build stamp for file names
-        Calendar cal = new GregorianCalendar()
-
-echo "got calendar - value="
-echo String.format('%1$tY%1$tm%1$td%1$tH%1$tM%1$tS', cal)
-
-        /*String*/ dateBuildNumber = 
-            String.format('%1$tY%1$tm%1$td%1$tH%1$tM%1$tS', cal) +
-            ".${buildNumber}"
+                        dateBuildNumber = buildSerialNumber buildNumber
 
                         // Generate the full version number.
 //                        fullVersionNumber = generateVersionNumber version, branchName, dateBuildNumber
