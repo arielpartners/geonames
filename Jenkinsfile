@@ -2,7 +2,7 @@
 //String nodeLabel = required value: parms.get('nodeLabel'), message: "'nodeLabel' parameter not set in the Jenkinsfile.  This parameter is required."
 
 // versionFile specifies a file that contains the version number that will be used for the entire project package, and is required.
-//String versionFile = required value: parms.get('versionFile'), message: "'versionFile' parameter not set in the Jenkinsfile.  This parameter is required."
+String versionFile //= required value: parms.get('versionFile'), message: "'versionFile' parameter not set in the Jenkinsfile.  This parameter is required."
 
 // projectName specifies a string that uniquely identifies the project, and is used to build several output filenames.  This is required.
 String projectName = 'geonames'
