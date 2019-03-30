@@ -112,6 +112,9 @@ pipeline {
         // Generate unique date / build stamp for file names
         Calendar cal = new GregorianCalendar()
 
+echo "got calendar - value="
+echo String.format('%1$tY%1$tm%1$td%1$tH%1$tM%1$tS', cal)
+
         /*String*/ dateBuildNumber = 
             String.format('%1$tY%1$tm%1$td%1$tH%1$tM%1$tS', cal) +
             ".${buildNumber}"
