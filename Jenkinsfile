@@ -46,7 +46,7 @@ String jobName
 String buildUrl
 String buildUrlSlackMessage
 String buildUrlHtmlMessage
-String octopusChannelId
+//String octopusChannelId
 
 String dateBuildNumber
 String fullVersionNumber = ""
