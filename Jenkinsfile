@@ -76,7 +76,11 @@ Boolean isRel = isRelease()
 */
 
 pipeline {
-    agent any
+    agent {
+        node {
+            customWorkspace URLDecoder.decode("${JENKINS_HOME}/${JOB_NAME}", "UTF-8")        
+        }
+    }
     stages {
         stage('initialization') {
             steps {
@@ -212,20 +216,21 @@ workspaceFolder: $workspaceFolder
         }
         stage('restore-nugets') {
             steps {
-                echo "Restoring project geonames.sln"
-                sh "dotnet restore geonames.sln" 
+                echo "Restoring project ${projectFile}"
+                sh "dotnet restore ${projectFile}" 
             }
         }
         stage('build-application') {
             steps {
-                echo "Building project geonames.sln"
-                sh "dotnet build geonames.sln"              
+                echo "Building project ${projectFile}"
+                sh "dotnet build ${projectFile}"              
             }
         }
         stage('publish-application') {
             steps {
-                echo "Publishing project geonames.sln"
-                sh "dotnet publish geonames.sln --configuration Release"
+                echo "Publishing project ${projectFile}"
+                // Package build outputs into the publish folder.
+                sh "dotnet publish ${projectFile} --configuration Release -o ${publishPhysicalFolder}"
             }
         }
         // Package up output in dist folder as a nuget 
@@ -233,7 +238,7 @@ workspaceFolder: $workspaceFolder
             steps {
                 // Move to the publishPhysicalFolder folder and create the nupkg file in the workspace folder using zip.
                 echo "Package up output in dist folder as a nuget"
-                sh "cd publish && zip -r \"${workspaceFolder}/${nupkgFileName}\" . && cd \"${workspaceFolder}\""
+                sh "cd ${publishFolder} && zip -r \"${workspaceFolder}/${nupkgFileName}\" . && cd \"${workspaceFolder}\""
             }
         }
         // Push nuget build to artifactory, make new octopus build pointing to that
