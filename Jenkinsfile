@@ -78,6 +78,7 @@ Boolean isRel = isRelease()
 pipeline {
     agent {
         node {
+            label 'any'
             customWorkspace URLDecoder.decode("${JENKINS_HOME}/${JOB_NAME}", "UTF-8")        
         }
     }
