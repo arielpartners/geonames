@@ -79,7 +79,7 @@ pipeline {
     agent {
         node {
             label 'any'
-            customWorkspace URLDecoder.decode("${JENKINS_HOME}/${JOB_NAME}", "UTF-8")        
+            customWorkspace URLDecoder.decode("${JENKINS_HOME}/workspace/${JOB_NAME}", "UTF-8")        
         }
     }
     stages {
@@ -243,10 +243,10 @@ workspaceFolder: $workspaceFolder
             }
         }
         // Push nuget build to artifactory, make new octopus build pointing to that
-        // stage('deploy-application') {
-        //     steps {
-        //         echo "Publish nuget build to Artifactory"
-        //         sh "dotnet nuget push ${nupkgFileName} --api-key ${globals.artifactoryUserName}:${globals.artifactoryNugetPassword} --source https://${artifactoryPublishUrl}"
+         stage('deploy-application') {
+             steps {
+                 echo "Publish nuget build to Artifactory"
+                 sh "dotnet nuget push \"${nupkgFileName}\" --api-key admin:AP9oX9qHXhr18udokbaDRUCZ4RB --source https://jfrogdemoinst1.jfrog.io/jfrogdemoinst1/api/nuget/builds/geonames"
 
         //         echo "Make new octopus build pointing to that"
         //         // Create the JSON file and save it in the current folder.
@@ -258,7 +258,7 @@ workspaceFolder: $workspaceFolder
         //             octopusChannelId: octopusChannelId,
         //             buildUrl: buildUrl
         //         )
-        //     }
-        // }
+             }
+        }
     }
 }
