@@ -232,6 +232,18 @@ workspaceFolder: $workspaceFolder
                 echo "Publishing project ${projectFile}"
                 // Package build outputs into the publish folder.
                 sh "dotnet publish ${projectFile} --configuration Release -o \"${publishPhysicalFolder}\""
+
+                // Create the nuspec file and save it in the publish folder.
+                script {
+                    echo "Writing nuspec file: ${publishPhysicalFolder}/${nuspecFileName}"
+                    writeNuspecFile publishPhysicalFolder, nuspecFileName, nuspecId, fullVersionNumber, nuspecAuthor, nuspecDescription
+
+                    if (fileExists("${publishPhysicalFolder}/${nuspecFileName}")) {
+                        echo 'Nuspec File written successfully.'
+                    } else {
+                        echo 'ERROR writing Nuspec file!'
+                    }
+                }
             }
         }
         // Package up output in dist folder as a nuget 
