@@ -155,7 +155,7 @@ pipeline {
 
                         // Delete existing publish folder.
                         echo "Deleting any existing publish folder ${publishPhysicalFolder}"
-                        //sh "rm -rf ${publishPhysicalFolder}"
+                        sh "rm -rf ${publishPhysicalFolder}"
 
                         nupkgFileName = "${projectName}.${fullVersionNumber}.nupkg"
                         nuspecFileName = "${projectName}.${fullVersionNumber}.nuspec"
@@ -233,7 +233,7 @@ workspaceFolder: $workspaceFolder
             steps {
                 // Move to the publishPhysicalFolder folder and create the nupkg file in the workspace folder using zip.
                 echo "Package up output in dist folder as a nuget"
-                sh "cd publish && zip -r ${workspaceFolder}/${nupkgFileName} . && cd ${workspaceFolder}"
+                sh "cd publish && zip -r '${workspaceFolder}/${nupkgFileName}'' . && cd '${workspaceFolder}''"
             }
         }
         // Push nuget build to artifactory, make new octopus build pointing to that
