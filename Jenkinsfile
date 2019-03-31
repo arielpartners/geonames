@@ -231,7 +231,7 @@ workspaceFolder: $workspaceFolder
             steps {
                 echo "Publishing project ${projectFile}"
                 // Package build outputs into the publish folder.
-                sh "dotnet publish ${projectFile} --configuration Release -o ${publishPhysicalFolder}"
+                sh "dotnet publish ${projectFile} --configuration Release -o \"${publishPhysicalFolder}\""
             }
         }
         // Package up output in dist folder as a nuget 
