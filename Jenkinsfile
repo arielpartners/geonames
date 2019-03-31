@@ -155,7 +155,7 @@ pipeline {
 
                         // Delete existing publish folder.
                         echo "Deleting any existing publish folder ${publishPhysicalFolder}"
-                        sh "rm -rf ${publishPhysicalFolder}"
+                        //sh "rm -rf ${publishPhysicalFolder}"
 
                         nupkgFileName = "${projectName}.${fullVersionNumber}.nupkg"
                         nuspecFileName = "${projectName}.${fullVersionNumber}.nuspec"
