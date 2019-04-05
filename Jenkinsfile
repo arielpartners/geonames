@@ -209,13 +209,13 @@ workspaceFolder: $workspaceFolder
 """
             }
         }
-        stage('clear-nugets') {
+        stage('clear-dependencies') {
             steps {               
                 echo "Clearing nuget packages"
                 sh "dotnet nuget locals --clear all"                       
             }
         }
-        stage('restore-nugets') {
+        stage('restore-dependencies') {
             steps {
                 echo "Restoring project ${projectFile}"
                 sh "dotnet restore ${projectFile}" 
