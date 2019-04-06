@@ -14,7 +14,8 @@ namespace GeoNames.Tests
         public void GetCountries()
         {
             var client = GetClient();
-            var countries = client.GetCountries();
+            var result = client.GetCountries();
+            var countries = result.Value;
 
             Assert.IsTrue(countries.Count() > 0);
         }
@@ -32,7 +33,8 @@ namespace GeoNames.Tests
         public void GetRegions()
         {
             var client = GetClient();
-            var regions = client.GetRegions("US");
+            var result = client.GetRegions("US");
+            var regions = result.Value;
 
             Assert.IsTrue(regions.Count() > 0);
         }
@@ -41,7 +43,8 @@ namespace GeoNames.Tests
         public void GetCities()
         {
             var client = GetClient();
-            var cities = client.GetCities("US", "NY");
+            var result = client.GetCities("US", "NY");
+            var cities = result.Value;
 
             Assert.IsTrue(cities.Count() > 0);
         }
@@ -59,7 +62,8 @@ namespace GeoNames.Tests
         public void FindNearbyPlaces()
         {
             var client = GetClient();
-            var places = client.FindNearbyPlaces(40.68607F, -73.921068F, 10F, 20);
+            var result = client.FindNearbyPlaces(40.68607F, -73.921068F, 10F, 20);
+            var places = result.Value;
 
             Assert.IsTrue(places.Count() > 0);
         }
@@ -68,7 +72,8 @@ namespace GeoNames.Tests
         public void PostalCodeLookup()
         {
             var client = GetClient();
-            var postalCodes = client.PostalCodeLookup("US", "11216", 20);
+            var result = client.PostalCodeLookup("US", "11216", 20);
+            var postalCodes = result.Value;
 
             Assert.IsTrue(postalCodes.Count() > 0);
         }
@@ -86,7 +91,8 @@ namespace GeoNames.Tests
         public void Hierarchy()
         {
             var client = GetClient();
-            var hierarchy = client.Hierarchy(6252001);
+            var result = client.Hierarchy(6252001);
+            var hierarchy = result.Value;
 
             Assert.IsTrue(hierarchy.Count() > 0);
         }

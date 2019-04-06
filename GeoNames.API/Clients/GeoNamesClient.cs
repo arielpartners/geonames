@@ -11,14 +11,13 @@ namespace GeoNames.API
     {
         #region  Private Storage 
 
-        static IEnumerable<Country> _countries;
+        static IApiMetricResult<IEnumerable<Country>> _countries;
         static IDictionary<string, int> _countryCodeMap;
 
         static Logger _logger = LogManager.GetCurrentClassLogger();
-
-        string GeoNamesUserName;
+        readonly string GeoNamesUserName;
         static Verbosity defaultVerbosity = Verbosity.medium;
-        Verbosity verbosity;
+        readonly Verbosity verbosity;
 
         #endregion
 
@@ -38,30 +37,49 @@ namespace GeoNames.API
 
         #region Public APIs
 
+        public string SourceName() => "GeoNames.org Web Service Client";
+
         IGeoNamesClient IGeoNamesClient.Source { get; set; }
 
-        public LookupResult LookupLocation(float latitude, float longitude)
+        public IApiMetricResult<LookupResult> LookupLocation(float latitude, float longitude)
         {
-            var result = new LookupResult { StreetAddress = FindNearestAddress(latitude, longitude) };
-
-            if (result.StreetAddress != null)
+            var result = new ApiMetricResult<LookupResult>
             {
-                result.CountryCode = result.StreetAddress.countryCode;
-                result.RegionCode = result.StreetAddress.regionCode;
-                result.PostalCode = result.StreetAddress.postalcode;
+                ResultSource = SourceName(),
+                Value = new LookupResult()
+            };
+            var lookupResult = result.Value;
+
+            var streetAddress = FindNearestAddress(latitude, longitude);
+
+            if (streetAddress.Value != null)
+            {
+                result.CreatedTime = streetAddress.CreatedTime;
+                result.TimeToCreate = streetAddress.TimeToCreate;
+                lookupResult.CountryCode = streetAddress.Value.countryCode;
+                lookupResult.RegionCode = streetAddress.Value.regionCode;
+                lookupResult.PostalCode = streetAddress.Value.postalcode;
             }
             else
             {
-                result.Place = FindNearbyPlaces(latitude, longitude, 10, 1).First();
+                var places = FindNearbyPlaces(latitude, longitude, 10, 1);
+                result.CreatedTime = places.CreatedTime;
+                result.TimeToCreate = places.TimeToCreate;
 
-                result.CountryCode = result.Place.countryCode;
-                result.RegionCode = result.Place.regionCode;
+                var place = places.Value.First();
+                lookupResult.CountryCode = place.countryCode;
+                lookupResult.RegionCode = place.regionCode;
             }
 
-            result.Regions = GetRegions(result.CountryCode);
-            result.Cities = GetCities(result.CountryCode, result.RegionCode, verbosity);
+            var regions = GetRegions(lookupResult.CountryCode);
+            result.TimeToCreate += regions.TimeToCreate;
+            lookupResult.Regions = regions.Value;
 
-            result.CityName = result.Cities.
+            var cities = GetCities(lookupResult.CountryCode, lookupResult.RegionCode, verbosity);
+            result.TimeToCreate += cities.TimeToCreate;
+            lookupResult.Cities = cities.Value;
+
+            lookupResult.CityName = lookupResult.Cities.
                 Where(city => city.Contains(latitude, longitude)).
                 Select(city => city.cityName).
                 FirstOrDefault();
@@ -69,14 +87,14 @@ namespace GeoNames.API
             return result;
         }
 
-        public IEnumerable<Country> GetCountries()
+        public IApiMetricResult<IEnumerable<Country>> GetCountries()
         {
             try
             {
                 if (_countries == null)
                 {
                     _countries = Countries(verbosity);
-                    _countryCodeMap = _countries.Select(country => new
+                    _countryCodeMap = _countries.Value.Select(country => new
                         {
                             Code = country.countryCode,
                             GeoId = country.geonameId
@@ -91,11 +109,15 @@ namespace GeoNames.API
             catch (Exception ex)
             {
                 _logger.Error(ex);
-                return Enumerable.Empty<Country>();
+                return new ApiMetricResult<IEnumerable<Country>>
+                {
+                    ResultSource = SourceName(),
+                    Value = Enumerable.Empty<Country>()
+                };
             }
         }
 
-        public IEnumerable<Region> GetRegions(string countryCode, Verbosity style)
+        public IApiMetricResult<IEnumerable<Region>> GetRegions(string countryCode, Verbosity style)
         {
             if (_countryCodeMap == null)
             {
@@ -107,12 +129,11 @@ namespace GeoNames.API
             return regions;
         }
 
-        public IEnumerable<Region> GetRegions(string countryCode) =>
+        public IApiMetricResult<IEnumerable<Region>> GetRegions(string countryCode) =>
             GetRegions(countryCode, verbosity);
 
-        public IEnumerable<City> GetCities(string countryCode, string regionCode, Verbosity style)
+        public IApiMetricResult<IEnumerable<City>> GetCities(string countryCode, string regionCode, Verbosity style)
         {
-            var cities = new List<City>();
             var startRow = 0;
             var maxRows = 1000;
             var urlParms = new[]
@@ -124,60 +145,71 @@ namespace GeoNames.API
                 new KeyValuePair<string, string>("maxRows", maxRows.ToString())
             };
 
-            var result = Search<City>(urlParms, style);
-            var totalResultsCount = result.Count();
+            var _cities = Search<City>(urlParms, style);
+            var totalResultsCount = _cities.Value.Count();
+
+            var result = new ApiMetricResult<IEnumerable<City>>
+            {
+                ResultSource = SourceName(),
+                CreatedTime = _cities.CreatedTime,
+                Value = new List<City>()
+            };
+            var cities = result.Value as List<City>;
 
             while (cities.Count < totalResultsCount)
             {
-                cities.AddRange(result);
+                cities.AddRange(_cities.Value);
+                result.TimeToCreate += _cities.TimeToCreate;
 
                 startRow = cities.Count;
                 urlParms[0] = new KeyValuePair<string, string>("startRow", startRow.ToString());
 
-                result = Search<City>(urlParms, style);
+                _cities = Search<City>(urlParms, style);
             }
 
-            return cities.OrderBy(city => city.cityName).ToList();
+            result.Value = cities.OrderBy(city => city.cityName).ToList();
+            return result;
         }
 
-        public IEnumerable<City> GetCities(string countryCode, string regionCode) =>
+        public IApiMetricResult<IEnumerable<City>> GetCities(string countryCode, string regionCode) =>
             GetCities(countryCode, regionCode, verbosity);
 
-        public StreetAddress FindNearestAddress(float latitude, float longitude, Verbosity style) =>
+        public IApiMetricResult<StreetAddress> FindNearestAddress(float latitude, float longitude, Verbosity style) =>
             NearestAddress(latitude, longitude, style);
 
-        public StreetAddress FindNearestAddress(float latitude, float longitude) =>
+        public IApiMetricResult<StreetAddress> FindNearestAddress(float latitude, float longitude) =>
             FindNearestAddress(latitude, longitude, verbosity);
 
-        public IEnumerable<Place> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<Place>> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style) =>
             NearbyPlaces(latitude, longitude, radius, maxRows, style);
 
-        public IEnumerable<Place> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows) =>
+        public IApiMetricResult<IEnumerable<Place>> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows) =>
             FindNearbyPlaces(latitude, longitude, radius, maxRows, verbosity);
 
-        public IEnumerable<PostalCode> PostalCodeLookup(string countryCode, string postalCode, int maxRows, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<PostalCode>> PostalCodeLookup(string countryCode, string postalCode, int maxRows, Verbosity style) =>
             LookupPostalCode(countryCode, postalCode, maxRows, style);
 
-        public IEnumerable<PostalCode> PostalCodeLookup(string countryCode, string postalCode, int maxRows) =>
+        public IApiMetricResult<IEnumerable<PostalCode>> PostalCodeLookup(string countryCode, string postalCode, int maxRows) =>
             PostalCodeLookup(countryCode, postalCode, maxRows, verbosity);
 
-        public Toponym Get(int geoNameId, Verbosity style) =>
+        public IApiMetricResult<Toponym> Get(int geoNameId, Verbosity style) =>
             GetToponym(geoNameId, style);
 
-        public Toponym Get(int geoNameId) =>
+        public IApiMetricResult<Toponym> Get(int geoNameId) =>
             Get(geoNameId, verbosity);
 
-        public IEnumerable<Toponym> Hierarchy(int geoNameId, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<Toponym>> Hierarchy(int geoNameId, Verbosity style) =>
             GetHierarchy(geoNameId, style);
 
-        public IEnumerable<Toponym> Hierarchy(int geoNameId) =>
+        public IApiMetricResult<IEnumerable<Toponym>> Hierarchy(int geoNameId) =>
             Hierarchy(geoNameId, verbosity);
 
         #endregion
 
         #region  Private Methods 
 
-        Toponym HttpGet(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms)
+        IRestResponse<T> HttpGet<T>(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms)
+            where T : class, new()
         {
             try
             {
@@ -194,14 +226,13 @@ namespace GeoNames.API
                     }
                 }
 
-                var response = client.Execute<Toponym>(request);
-
+                var response = client.Execute<T>(request);
                 var responseUri = response.ResponseUri.AbsoluteUri;
                 _logger.Info($"Invoked Url {responseUri}");
 
                 if (response.IsSuccessful)
                 {
-                    return response.Data;
+                    return response;
                 }
 
                 _logger.Warn($"Url {responseUri} failed: {response.Content}");
@@ -214,98 +245,45 @@ namespace GeoNames.API
             }
         }
 
-        IEnumerable<TToponym> GetWebServiceItems<ToponymList, TToponym>(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms)
+        IApiMetricResult<Toponym> HttpGet(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms) =>
+            new ApiMetricResult<Toponym>(SourceName(), () =>
+        {
+            var response = HttpGet<Toponym>(restUrl, style, parms);
+            return response?.Data;
+        });
+
+        IApiMetricResult<IEnumerable<TToponym>> GetWebServiceItems<ToponymList, TToponym>(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms)
             where ToponymList : class, IToponymList<TToponym>, new()
-            where TToponym : class, new()
+            where TToponym : class, new() =>
+            new ApiMetricResult<IEnumerable<TToponym>>(SourceName(), () =>
         {
-            try
-            {
-                RestClient client = new RestClient("http://api.geonames.org");
-                RestRequest request = new RestRequest(restUrl, Method.GET);
-                request.AddQueryParameter("style", style.ToString())
-                    .AddQueryParameter("username", GeoNamesUserName);
+            var response = HttpGet<ToponymList>(restUrl, style, parms);
+            return response?.Data.items;
+        });
 
-                if (parms != null)
-                {
-                    foreach (var parm in parms)
-                    {
-                        request.AddQueryParameter(parm.Key, parm.Value);
-                    }
-                }
-
-                var response = client.Execute<ToponymList>(request);
-
-                var responseUri = response.ResponseUri.AbsoluteUri;
-                _logger.Info($"Invoked Url {responseUri}");
-
-                if (response.IsSuccessful)
-                {
-                    return response.Data.items;
-                }
-
-                _logger.Warn($"Url {responseUri} failed: {response.Content}");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex);
-                throw;
-            }
-        }
-
-        TToponym GetWebServiceItem<ToponymWrapper, TToponym>(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms)
+        IApiMetricResult<TToponym> GetWebServiceItem<ToponymWrapper, TToponym>(string restUrl, Verbosity style, IEnumerable<KeyValuePair<string, string>> parms)
             where ToponymWrapper : class, IToponymWrapper<TToponym>, new()
-            where TToponym : class, new()
+            where TToponym : class, new() =>
+            new ApiMetricResult<TToponym>(SourceName(), () =>
         {
-            try
-            {
-                RestClient client = new RestClient("http://api.geonames.org");
-                RestRequest request = new RestRequest(restUrl, Method.GET);
-                request.AddQueryParameter("style", style.ToString())
-                    .AddQueryParameter("username", GeoNamesUserName);
+            var response = HttpGet<ToponymWrapper>(restUrl, style, parms);
+            return response?.Data.item;
+        });
 
-                if (parms != null)
-                {
-                    foreach (var parm in parms)
-                    {
-                        request.AddQueryParameter(parm.Key, parm.Value);
-                    }
-                }
-
-                var response = client.Execute<ToponymWrapper>(request);
-
-                var responseUri = response.ResponseUri.AbsoluteUri;
-                _logger.Info($"Invoked Url {responseUri}");
-
-                if (response.IsSuccessful)
-                {
-                    return response.Data.item;
-                }
-
-                _logger.Warn($"Url {responseUri} failed: {response.Content}");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex);
-                throw;
-            }
-        }
-
-        IEnumerable<Country> Countries(Verbosity style) =>
+        IApiMetricResult<IEnumerable<Country>> Countries(Verbosity style) =>
             GetWebServiceItems<CountryList, Country>("/countryInfoJSON", style, Enumerable.Empty<KeyValuePair<string, string>>());
 
-        IEnumerable<TToponym> Children<TToponym>(int geoNameId, Verbosity style) where TToponym : Toponym, new()
+        IApiMetricResult<IEnumerable<TToponym>> Children<TToponym>(int geoNameId, Verbosity style) where TToponym : Toponym, new()
         {
             var parms = new[] { new KeyValuePair<string, string>("geonameId", geoNameId.ToString()) };
             return GetWebServiceItems<ToponymList<TToponym>, TToponym>("/childrenJSON", style, parms);
         }
 
-        IEnumerable<TToponym> Search<TToponym>(IEnumerable<KeyValuePair<string, string>> parms, Verbosity style)
+        IApiMetricResult<IEnumerable<TToponym>> Search<TToponym>(IEnumerable<KeyValuePair<string, string>> parms, Verbosity style)
             where TToponym : Toponym, new() =>
             GetWebServiceItems<ToponymList<TToponym>, TToponym>("/searchJSON", style, parms);
 
-        StreetAddress NearestAddress(float latitude, float longitude, Verbosity style)
+        IApiMetricResult<StreetAddress> NearestAddress(float latitude, float longitude, Verbosity style)
         {
             var parms = new[]
             {
@@ -317,7 +295,7 @@ namespace GeoNames.API
             return GetWebServiceItem<StreetAddressLookupResult, StreetAddress>("/findNearestAddressJSON", style, parms);
         }
 
-        IEnumerable<Place> NearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style)
+        IApiMetricResult<IEnumerable<Place>> NearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style)
         {
             var parms = new[]
             {
@@ -330,7 +308,7 @@ namespace GeoNames.API
             return GetWebServiceItems<PlaceList, Place>("/findNearbyPlaceNameJSON", style, parms);
         }
 
-        IEnumerable<PostalCode> LookupPostalCode(string countryCode, string postalCode, int maxRows, Verbosity style) 
+        IApiMetricResult<IEnumerable<PostalCode>> LookupPostalCode(string countryCode, string postalCode, int maxRows, Verbosity style) 
         {
             var parms = new[]
             {
@@ -342,13 +320,13 @@ namespace GeoNames.API
             return GetWebServiceItems<PostalCodeList, PostalCode>("/postalCodeLookupJSON", style, parms);
         }
 
-        Toponym GetToponym(int geoNameId, Verbosity style) 
+        IApiMetricResult<Toponym> GetToponym(int geoNameId, Verbosity style) 
         {
             var parms = new[] { new KeyValuePair<string, string>("geonameId", geoNameId.ToString()) };
             return HttpGet("/getJSON", style, parms);
         }
 
-        IEnumerable<Toponym> GetHierarchy(int geoNameId, Verbosity style)
+        IApiMetricResult<IEnumerable<Toponym>> GetHierarchy(int geoNameId, Verbosity style)
         {
             var parms = new[] { new KeyValuePair<string, string>("geonameId", geoNameId.ToString()) };
             return GetWebServiceItems<ToponymList, Toponym>("/hierarchyJSON", style, parms);

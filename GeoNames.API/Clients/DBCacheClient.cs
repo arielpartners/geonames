@@ -14,7 +14,7 @@ namespace GeoNames.API
     {
         #region  Private Storage 
 
-        static Logger _logger = LogManager.GetCurrentClassLogger();
+        static readonly Logger _logger = LogManager.GetCurrentClassLogger();
 
         static readonly int expirationSeconds = 60 * 60 * 24 * 365;
         readonly string ConnectionString;
@@ -40,105 +40,119 @@ namespace GeoNames.API
 
         #region Public APIs
 
+        public string SourceName() => "Database Cache Client";
+
         public IGeoNamesClient Source { get; set; }
 
-        public IEnumerable<Country> GetCountries() => DBCache(Source.GetCountries, "GetCountries");
+        public IApiMetricResult<IEnumerable<Country>> GetCountries() => DBCache(Source.GetCountries, "GetCountries");
 
-        public IEnumerable<City> GetCities(string countryCode, string regionCode, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<City>> GetCities(string countryCode, string regionCode, Verbosity style) =>
             DBCache(() => Source.GetCities(countryCode, regionCode, style), "GetCities", countryCode, regionCode, style);
 
-        public IEnumerable<City> GetCities(string countryCode, string regionCode) => GetCities(countryCode, regionCode, verbosity);
+        public IApiMetricResult<IEnumerable<City>> GetCities(string countryCode, string regionCode) => GetCities(countryCode, regionCode, verbosity);
 
-        public IEnumerable<Region> GetRegions(string countryCode, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<Region>> GetRegions(string countryCode, Verbosity style) =>
             DBCache(() => Source.GetRegions(countryCode, style), "GetRegions", countryCode, style);
 
-        public IEnumerable<Region> GetRegions(string countryCode) => GetRegions(countryCode, verbosity);
+        public IApiMetricResult<IEnumerable<Region>> GetRegions(string countryCode) => GetRegions(countryCode, verbosity);
 
-        public IEnumerable<Place> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<Place>> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style) =>
             DBCache(() => Source.FindNearbyPlaces(latitude, longitude, radius, maxRows, style), "FindNearbyPlaces", latitude, longitude, radius, maxRows, style);
 
-        public IEnumerable<Place> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows) =>
+        public IApiMetricResult<IEnumerable<Place>> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows) =>
             FindNearbyPlaces(latitude, longitude, radius, maxRows, verbosity);
 
-        public StreetAddress FindNearestAddress(float latitude, float longitude, Verbosity style) =>
+        public IApiMetricResult<StreetAddress> FindNearestAddress(float latitude, float longitude, Verbosity style) =>
             DBCache(() => Source.FindNearestAddress(latitude, longitude, style), "FindNearestAddress", latitude, longitude, style);
 
-        public StreetAddress FindNearestAddress(float latitude, float longitude) =>
+        public IApiMetricResult<StreetAddress> FindNearestAddress(float latitude, float longitude) =>
             FindNearestAddress(latitude, longitude, verbosity);
 
-        public Toponym Get(int geoNameId, Verbosity style) => DBCache(() => Source.Get(geoNameId, style), "Get", geoNameId, style);
+        public IApiMetricResult<Toponym> Get(int geoNameId, Verbosity style) => DBCache(() => Source.Get(geoNameId, style), "Get", geoNameId, style);
 
-        public Toponym Get(int geoNameId) => Get(geoNameId, verbosity);
+        public IApiMetricResult<Toponym> Get(int geoNameId) => Get(geoNameId, verbosity);
 
-        public IEnumerable<Toponym> Hierarchy(int geoNameId, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<Toponym>> Hierarchy(int geoNameId, Verbosity style) =>
             DBCache(() => Source.Hierarchy(geoNameId, style), "Hierarchy", geoNameId, style);
 
-        public IEnumerable<Toponym> Hierarchy(int geoNameId) => Hierarchy(geoNameId, verbosity);
+        public IApiMetricResult<IEnumerable<Toponym>> Hierarchy(int geoNameId) => Hierarchy(geoNameId, verbosity);
 
-        public LookupResult LookupLocation(float latitude, float longitude) => DBCache(() => Source.LookupLocation(latitude, longitude), "LookupLocation", latitude, longitude);
+        public IApiMetricResult<LookupResult> LookupLocation(float latitude, float longitude) => DBCache(() => Source.LookupLocation(latitude, longitude), "LookupLocation", latitude, longitude);
 
-        public IEnumerable<PostalCode> PostalCodeLookup(string countryCode, string postalCode, int maxRows, Verbosity style) =>
+        public IApiMetricResult<IEnumerable<PostalCode>> PostalCodeLookup(string countryCode, string postalCode, int maxRows, Verbosity style) =>
             DBCache(() => Source.PostalCodeLookup(countryCode, postalCode, maxRows, style), "PostalCodeLookup", countryCode, postalCode, maxRows, style);
 
-        public IEnumerable<PostalCode> PostalCodeLookup(string countryCode, string postalCode, int maxRows) =>
+        public IApiMetricResult<IEnumerable<PostalCode>> PostalCodeLookup(string countryCode, string postalCode, int maxRows) =>
             PostalCodeLookup(countryCode, postalCode, maxRows, verbosity);
 
         #endregion
 
-        string GetValue(IDbConnection db, string key) => db.Query<string>("GetValue", new { key }, commandType: CommandType.StoredProcedure).SingleOrDefault();
-        void SetValue(IDbConnection db, string key, string value, DateTime expirationDate) => db.Execute("SetValue", new { key, value, expirationDate }, commandType: CommandType.StoredProcedure);
+        string GetValueFromDatabase(IDbConnection db, string key) => db.Query<string>("GetValue", new { key }, commandType: CommandType.StoredProcedure).SingleOrDefault();
+        void SetValueToDatabase(IDbConnection db, string key, string value, DateTime expirationDate) => db.Execute("SetValue", new { key, value, expirationDate }, commandType: CommandType.StoredProcedure);
 
-        R DBCache<R>(Func<R> sourceGetter, params object[] parms) where R : class
+        IApiMetricResult<R> DBCache<R>(Func<IApiMetricResult<R>> sourceGetter, params object[] parms) where R : class
         {
             var key = GenerateCacheKey(parms);
 
             using (var db = new SqlConnection(ConnectionString))
             {
-                R item = null;
-                var serializedItem = GetValue(db, key);
+                IApiMetricResult<R> item = null;
+                DateTime createdTime = DateTime.UtcNow;
+                var serializedItem = GetValueFromDatabase(db, key);
 
                 if (string.IsNullOrWhiteSpace(serializedItem))
                 {
                     item = sourceGetter();
 
-                    serializedItem = JsonConvert.SerializeObject(item);
+                    serializedItem = JsonConvert.SerializeObject(item.Value);
                     var expirationDate = DateTime.UtcNow.AddSeconds(expirationSeconds);
-                    SetValue(db, key, serializedItem, expirationDate);
+                    SetValueToDatabase(db, key, serializedItem, expirationDate);
                 }
                 else
                 {
-                    item = JsonConvert.DeserializeObject<R>(serializedItem);
+                    TimeSpan timeToCreate = DateTime.UtcNow.Subtract(createdTime);
+                    item = new ApiMetricResult<R>
+                    {
+                         ResultSource = SourceName(),
+                         CreatedTime = createdTime,
+                         TimeToCreate = timeToCreate,
+                         Value = JsonConvert.DeserializeObject<R>(serializedItem)
+                    };
                 }
 
                 return item;
             }
         }
 
-        IEnumerable<R> DBCache<R>(Func<IEnumerable<R>> sourceGetter, params object[] parms)
-        {
-            var key = GenerateCacheKey(parms);
+        //IApiMetricResult<IEnumerable<R>> DBCache<R>(Func<IApiMetricResult<IEnumerable<R>>> sourceGetter, params object[] parms)
+        //{
+        //    var key = GenerateCacheKey(parms);
 
-            using (var db = new SqlConnection(ConnectionString))
-            {
-                IEnumerable<R> items = null;
-                var serializedItems = GetValue(db, key);
+        //    using (var db = new SqlConnection(ConnectionString))
+        //    {
+        //        IApiMetricResult<IEnumerable<R>> item = null;
+        //        var serializedItem = GetValue(db, key);
 
-                if (string.IsNullOrWhiteSpace(serializedItems))
-                {
-                    items = sourceGetter();
+        //        if (string.IsNullOrWhiteSpace(serializedItem))
+        //        {
+        //            item = sourceGetter();
 
-                    serializedItems = JsonConvert.SerializeObject(items);
-                    var expirationDate = DateTime.UtcNow.AddSeconds(expirationSeconds);
-                    SetValue(db, key, serializedItems, expirationDate);
-                }
-                else
-                {
-                    items = JsonConvert.DeserializeObject<IEnumerable<R>>(serializedItems);
-                }
+        //            serializedItem = JsonConvert.SerializeObject(item.Value);
+        //            var expirationDate = DateTime.UtcNow.AddSeconds(expirationSeconds);
+        //            SetValue(db, key, serializedItem, expirationDate);
+        //        }
+        //        else
+        //        {
+        //            item = new ApiMetricResult<IEnumerable<R>>
+        //            {
+        //                ResultSource = SourceName(),
+        //                Value = JsonConvert.DeserializeObject<IEnumerable<R>>(serializedItem)
+        //            };
+        //        }
 
-                return items;
-            }
-        }
+        //        return item;
+        //    }
+        //}
 
         static string GenerateCacheKey(params object[] parms)
         {

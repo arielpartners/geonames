@@ -5,22 +5,23 @@ namespace GeoNames.API
 {
     public interface IGeoNamesClient
     {
-        LookupResult LookupLocation(float latitude, float longitude);
-        IEnumerable<Country> GetCountries();
-        IEnumerable<Region> GetRegions(string countryCode, Verbosity style);
-        IEnumerable<Region> GetRegions(string countryCode);
-        IEnumerable<City> GetCities(string countryCode, string regionCode, Verbosity style);
-        IEnumerable<City> GetCities(string countryCode, string regionCode);
-        StreetAddress FindNearestAddress(float latitude, float longitude, Verbosity style);
-        StreetAddress FindNearestAddress(float latitude, float longitude);
-        IEnumerable<Place> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style);
-        IEnumerable<Place> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows);
-        IEnumerable<PostalCode> PostalCodeLookup(string countryCode, string postalCode, int maxRows, Verbosity style);
-        IEnumerable<PostalCode> PostalCodeLookup(string countryCode, string postalCode, int maxRows);
-        Toponym Get(int geoNameId, Verbosity style);
-        Toponym Get(int geoNameId);
-        IEnumerable<Toponym> Hierarchy(int geoNameId, Verbosity style);
-        IEnumerable<Toponym> Hierarchy(int geoNameId);
+        IApiMetricResult<LookupResult> LookupLocation(float latitude, float longitude);
+        IApiMetricResult<IEnumerable<Country>> GetCountries();
+        IApiMetricResult<IEnumerable<Region>> GetRegions(string countryCode, Verbosity style);
+        IApiMetricResult<IEnumerable<Region>> GetRegions(string countryCode);
+        IApiMetricResult<IEnumerable<City>> GetCities(string countryCode, string regionCode, Verbosity style);
+        IApiMetricResult<IEnumerable<City>> GetCities(string countryCode, string regionCode);
+        IApiMetricResult<StreetAddress> FindNearestAddress(float latitude, float longitude, Verbosity style);
+        IApiMetricResult<StreetAddress> FindNearestAddress(float latitude, float longitude);
+        IApiMetricResult<IEnumerable<Place>> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows, Verbosity style);
+        IApiMetricResult<IEnumerable<Place>> FindNearbyPlaces(float latitude, float longitude, float radius, int maxRows);
+        IApiMetricResult<IEnumerable<PostalCode>> PostalCodeLookup(string countryCode, string postalCode, int maxRows, Verbosity style);
+        IApiMetricResult<IEnumerable<PostalCode>> PostalCodeLookup(string countryCode, string postalCode, int maxRows);
+        IApiMetricResult<Toponym> Get(int geoNameId, Verbosity style);
+        IApiMetricResult<Toponym> Get(int geoNameId);
+        IApiMetricResult<IEnumerable<Toponym>> Hierarchy(int geoNameId, Verbosity style);
+        IApiMetricResult<IEnumerable<Toponym>> Hierarchy(int geoNameId);
         IGeoNamesClient Source { get; set; }
+        string SourceName();
     }
 }
